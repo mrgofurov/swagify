@@ -5,6 +5,8 @@ package router
 import (
 	"reflect"
 
+	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/swagify/core"
 )
 
@@ -52,6 +54,10 @@ type Route struct {
 	QueryType  reflect.Type
 	PathType   reflect.Type
 	HeaderType reflect.Type
+
+	// Middlewares
+	FiberMiddlewares []fiber.Handler
+	GinMiddlewares   []gin.HandlerFunc
 }
 
 // RouteResponse represents a response definition for a specific status code.
