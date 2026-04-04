@@ -19,6 +19,9 @@ type FiberAdapter struct {
 	// Configuration
 	openAPIPath string
 	docsPath    string
+
+	// Docs authentication
+	docsAuth *DocsAuthConfig
 }
 
 // FiberConfig holds configuration for the Fiber adapter.
@@ -69,8 +72,6 @@ func NewFiber(app *fiber.App, configs ...FiberConfig) *FiberAdapter {
 			adapter.docsPath = cfg.DocsPath
 		}
 		for name, scheme := range cfg.SecuritySchemes {
-			scheme.Description = scheme.Description // preserve
-			_ = name
 			adapter.registry.AddSecurityScheme(name, scheme)
 		}
 		if cfg.GlobalSecurity != nil {
@@ -304,6 +305,26 @@ func (f *FiberAdapter) registerRoute(method, path string, handler fiber.Handler,
 	}
 }
 
+// BasicAuth protects the docs UI and OpenAPI JSON endpoints with HTTP Basic Authentication.
+// Must be called before RegisterOpenAPI() and RegisterDocs().
+//
+// Simple usage:
+//
+//	api.BasicAuth("admin", "secret123")
+//
+// With config:
+//
+//	api.BasicAuth("admin", "secret123", swagify.DocsAuthConfig{Realm: "My API Docs"})
+func (f *FiberAdapter) BasicAuth(username, password string, configs ...DocsAuthConfig) {
+	cfg := DocsAuthConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
+	cfg.Username = username
+	cfg.Password = password
+	f.docsAuth = &cfg
+}
+
 // RegisterOpenAPI registers the OpenAPI JSON endpoint.
 func (f *FiberAdapter) RegisterOpenAPI(path ...string) {
 	p := f.openAPIPath
@@ -312,7 +333,7 @@ func (f *FiberAdapter) RegisterOpenAPI(path ...string) {
 		f.openAPIPath = p
 	}
 
-	f.app.Get(p, func(c *fiber.Ctx) error {
+	handler := func(c *fiber.Ctx) error {
 		gen := openapi.NewGenerator(f.registry)
 		doc := gen.Generate()
 		data, err := json.MarshalIndent(doc, "", "  ")
@@ -321,7 +342,13 @@ func (f *FiberAdapter) RegisterOpenAPI(path ...string) {
 		}
 		c.Set("Content-Type", "application/json")
 		return c.Send(data)
-	})
+	}
+
+	if f.docsAuth != nil {
+		f.app.Get(p, fiberBasicAuth(*f.docsAuth), handler)
+	} else {
+		f.app.Get(p, handler)
+	}
 }
 
 // RegisterDocs registers the docs UI endpoint.
@@ -330,7 +357,12 @@ func (f *FiberAdapter) RegisterDocs(path ...string) {
 	if len(path) > 0 {
 		p = path[0]
 	}
-	ui.RegisterFiber(f.app, p, f.openAPIPath)
+
+	if f.docsAuth != nil {
+		ui.RegisterFiberWithAuth(f.app, p, f.openAPIPath, fiberBasicAuth(*f.docsAuth))
+	} else {
+		ui.RegisterFiber(f.app, p, f.openAPIPath)
+	}
 }
 
 // WithRequest sets the request body type for documentation on untyped handlers.
@@ -347,6 +379,130 @@ func WithResponse(model any) RouteOption {
 	return func(r *Route) {
 		if model != nil {
 			r.ResponseType = reflect.TypeOf(model)
+		}
+	}
+}
+
+// Discover scans all existing routes registered on the Fiber app and
+// automatically generates documentation entries for them. This allows
+// using Swagify with existing projects without migrating route registration.
+//
+// Usage:
+//
+//	app := fiber.New()
+//	app.Get("/users", listUsers)
+//	app.Post("/users", createUser)
+//
+//	api := swagify.NewFiber(app)
+//	api.Discover() // auto-documents all routes
+//	api.RegisterOpenAPI()
+//	api.RegisterDocs()
+func (f *FiberAdapter) Discover(opts ...DiscoverOptions) {
+	opt := DiscoverOptions{}
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+
+	// Set defaults
+	if opt.AutoTags == nil {
+		opt.AutoTags = boolPtr(true)
+	}
+	if opt.AutoSummary == nil {
+		opt.AutoSummary = boolPtr(true)
+	}
+
+	// Use Fiber's GetRoutes to discover all registered routes.
+	// The false parameter tells Fiber not to filter by method.
+	routes := f.app.GetRoutes(true)
+
+	// Deduplicate: Fiber may return duplicate routes for the same method+path
+	seen := make(map[string]bool)
+
+	for _, fr := range routes {
+		method := fr.Method
+		path := fr.Path
+
+		// Skip unsupported methods
+		if method == "HEAD" || method == "OPTIONS" || method == "TRACE" || method == "CONNECT" {
+			continue
+		}
+
+		// Deduplicate
+		key := method + " " + path
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		// Apply path filters
+		if !shouldInclude(path, opt) {
+			continue
+		}
+
+		// Check if this route is already registered (avoid duplicates from mixed usage)
+		if existing := f.registry.FindRoute(key); existing != nil {
+			continue
+		}
+
+		// Build the route
+		route := &Route{
+			Method: method,
+			Path:   path,
+		}
+
+		// Auto-generate summary
+		if *opt.AutoSummary {
+			route.Summary = autoSummary(method, path)
+		}
+
+		// Auto-generate tags
+		if *opt.AutoTags {
+			tag := autoTag(path)
+			if tag != "" {
+				route.Tags = []string{tag}
+			}
+		}
+
+		// Register (docs only — handler is already bound to the Fiber app)
+		f.registry.Register(route)
+	}
+}
+
+// Enrich adds metadata to a previously discovered (or registered) route.
+// The key format is "METHOD /path", e.g., "GET /users/:id".
+//
+// Usage:
+//
+//	api.Discover()
+//	api.Enrich("GET /users", swagify.Summary("List all users"), swagify.WithResponse(UsersResponse{}))
+//	api.Enrich("POST /users", swagify.WithRequest(CreateUserReq{}), swagify.WithResponse(UserResponse{}))
+func (f *FiberAdapter) Enrich(key string, opts ...RouteOption) {
+	route := f.registry.FindRoute(key)
+	if route == nil {
+		return
+	}
+
+	applyOptions(route, opts)
+
+	// Re-generate schemas for any new types added via enrichment
+	if route.RequestType != nil {
+		f.registry.SchemaGenerator().GenerateSchemaFromType(route.RequestType)
+	}
+	if route.ResponseType != nil {
+		f.registry.SchemaGenerator().GenerateSchemaFromType(route.ResponseType)
+	}
+	if route.QueryType != nil {
+		f.registry.SchemaGenerator().GenerateSchemaFromType(route.QueryType)
+	}
+	if route.PathType != nil {
+		f.registry.SchemaGenerator().GenerateSchemaFromType(route.PathType)
+	}
+	if route.HeaderType != nil {
+		f.registry.SchemaGenerator().GenerateSchemaFromType(route.HeaderType)
+	}
+	for _, resp := range route.Responses {
+		if resp.Type != nil {
+			f.registry.SchemaGenerator().GenerateSchemaFromType(resp.Type)
 		}
 	}
 }

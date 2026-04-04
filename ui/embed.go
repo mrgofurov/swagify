@@ -58,6 +58,19 @@ func RegisterFiber(app *fiber.App, docsPath, specURL string) {
 	})
 }
 
+// RegisterFiberWithAuth registers the docs UI route on a Fiber app with an auth middleware.
+func RegisterFiberWithAuth(app *fiber.App, docsPath, specURL string, authMiddleware fiber.Handler) {
+	html, err := renderHTML(specURL)
+	if err != nil {
+		panic("swagify: failed to render docs UI template: " + err.Error())
+	}
+
+	app.Get(docsPath, authMiddleware, func(c *fiber.Ctx) error {
+		c.Set("Content-Type", "text/html; charset=utf-8")
+		return c.SendString(html)
+	})
+}
+
 // RegisterGin registers the docs UI route on a Gin engine.
 func RegisterGin(engine *gin.Engine, docsPath, specURL string) {
 	html, err := renderHTML(specURL)
@@ -66,6 +79,18 @@ func RegisterGin(engine *gin.Engine, docsPath, specURL string) {
 	}
 
 	engine.GET(docsPath, func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+	})
+}
+
+// RegisterGinWithAuth registers the docs UI route on a Gin engine with an auth middleware.
+func RegisterGinWithAuth(engine *gin.Engine, docsPath, specURL string, authMiddleware gin.HandlerFunc) {
+	html, err := renderHTML(specURL)
+	if err != nil {
+		panic("swagify: failed to render docs UI template: " + err.Error())
+	}
+
+	engine.GET(docsPath, authMiddleware, func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 	})
 }
@@ -82,3 +107,19 @@ func RegisterHTTP(mux *http.ServeMux, docsPath, specURL string) {
 		w.Write([]byte(html))
 	})
 }
+
+// RegisterHTTPWithAuth registers the docs UI route on a standard http.ServeMux with auth middleware.
+func RegisterHTTPWithAuth(mux *http.ServeMux, docsPath, specURL string, authMiddleware func(http.Handler) http.Handler) {
+	html, err := renderHTML(specURL)
+	if err != nil {
+		panic("swagify: failed to render docs UI template: " + err.Error())
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(html))
+	})
+
+	mux.Handle("GET "+docsPath, authMiddleware(handler))
+}
+

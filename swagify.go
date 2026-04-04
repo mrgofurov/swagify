@@ -209,3 +209,10 @@ type FiberConfig = router.FiberConfig
 
 // GinConfig holds configuration for the Gin adapter.
 type GinConfig = router.GinConfig
+
+// DiscoverOptions configures how route auto-discovery behaves.
+type DiscoverOptions = router.DiscoverOptions
+
+// DocsAuthConfig holds credentials for protecting the docs and OpenAPI endpoints.
+type DocsAuthConfig = router.DocsAuthConfig
+

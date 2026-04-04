@@ -196,3 +196,121 @@ api.POST("/users", createUser,
 	swagify.ErrorResponse(400, ErrorResponse{}, "Invalid request body"),
 )
 ```
+
+## Auto-Discovery (Zero Migration)
+
+Already have a Fiber or Gin project with hundreds of routes? No need to rewrite them. Use `Discover()` to auto-generate documentation from your existing routes:
+
+### Fiber
+
+```go
+// Your existing app — nothing changes here
+app := fiber.New()
+app.Get("/users", listUsers)
+app.Get("/users/:id", getUser)
+app.Post("/users", createUser)
+app.Put("/users/:id", updateUser)
+app.Delete("/users/:id", deleteUser)
+
+// Attach Swagify and auto-discover all routes
+api := swagify.NewFiber(app, swagify.FiberConfig{
+    Info: &core.Info{
+        Title:   "My API",
+        Version: "1.0.0",
+    },
+})
+api.Discover()
+
+api.RegisterOpenAPI()
+api.RegisterDocs()
+log.Fatal(app.Listen(":8080"))
+```
+
+### Gin
+
+```go
+r := gin.Default()
+r.GET("/products", listProducts)
+r.POST("/products", createProduct)
+
+api := swagify.NewGin(r)
+api.Discover()
+
+api.RegisterOpenAPI()
+api.RegisterDocs()
+r.Run(":8080")
+```
+
+### Enriching Discovered Routes
+
+After discovery, you can optionally enrich specific routes with request/response types and metadata:
+
+```go
+api.Discover()
+
+// Add rich documentation to specific routes
+api.Enrich("GET /users",
+    swagify.Summary("List all users"),
+    swagify.Tags("Users"),
+    swagify.WithResponse(UserListResponse{}),
+    swagify.QueryParams(ListUsersQuery{}),
+)
+
+api.Enrich("POST /users",
+    swagify.Summary("Create a new user"),
+    swagify.Tags("Users"),
+    swagify.WithRequest(CreateUserRequest{}),
+    swagify.WithResponse(UserResponse{}),
+)
+```
+
+### Discovery Options
+
+Control which routes are discovered:
+
+```go
+api.Discover(swagify.DiscoverOptions{
+    // Only document routes under /api
+    IncludePaths: []string{"/api"},
+
+    // Skip health/metrics endpoints
+    ExcludePaths: []string{"/internal", "/metrics"},
+})
+```
+
+### What Discover Auto-Generates
+
+Even without enrichment, `Discover()` generates useful documentation:
+
+| Route | Auto Summary | Auto Tag |
+|-------|-------------|----------|
+| `GET /users` | List users | Users |
+| `GET /users/:id` | Get user by id | Users |
+| `POST /users` | Create user | Users |
+| `PUT /users/:id` | Update user by id | Users |
+| `DELETE /users/:id` | Delete user by id | Users |
+| `GET /api/v1/orders` | List orders | Orders |
+
+## Protecting Docs with BasicAuth
+
+Protect your `/docs` and `/openapi.json` endpoints with HTTP Basic Authentication:
+
+```go
+api := swagify.NewFiber(app)
+
+// Simple — just username and password
+api.BasicAuth("admin", "secret123")
+
+api.RegisterOpenAPI()  // protected
+api.RegisterDocs()     // protected
+```
+
+With a custom realm (shown in the browser prompt):
+
+```go
+api.BasicAuth("admin", "secret123", swagify.DocsAuthConfig{
+    Realm: "My API Documentation",
+})
+```
+
+> **Note:** `BasicAuth()` must be called **before** `RegisterOpenAPI()` and `RegisterDocs()`. It only protects the docs endpoints — your API routes remain unaffected.

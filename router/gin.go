@@ -20,6 +20,9 @@ type GinAdapter struct {
 	// Configuration
 	openAPIPath string
 	docsPath    string
+
+	// Docs authentication
+	docsAuth *DocsAuthConfig
 }
 
 // GinConfig holds configuration for the Gin adapter.
@@ -313,6 +316,26 @@ func (g *GinAdapter) registerRoute(method, path string, handler gin.HandlerFunc,
 	}
 }
 
+// BasicAuth protects the docs UI and OpenAPI JSON endpoints with HTTP Basic Authentication.
+// Must be called before RegisterOpenAPI() and RegisterDocs().
+//
+// Simple usage:
+//
+//	api.BasicAuth("admin", "secret123")
+//
+// With config:
+//
+//	api.BasicAuth("admin", "secret123", swagify.DocsAuthConfig{Realm: "My API Docs"})
+func (g *GinAdapter) BasicAuth(username, password string, configs ...DocsAuthConfig) {
+	cfg := DocsAuthConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
+	cfg.Username = username
+	cfg.Password = password
+	g.docsAuth = &cfg
+}
+
 // RegisterOpenAPI registers the OpenAPI JSON endpoint.
 func (g *GinAdapter) RegisterOpenAPI(path ...string) {
 	p := g.openAPIPath
@@ -321,7 +344,7 @@ func (g *GinAdapter) RegisterOpenAPI(path ...string) {
 		g.openAPIPath = p
 	}
 
-	g.engine.GET(p, func(c *gin.Context) {
+	handler := func(c *gin.Context) {
 		gen := openapi.NewGenerator(g.registry)
 		doc := gen.Generate()
 		data, err := json.MarshalIndent(doc, "", "  ")
@@ -330,7 +353,13 @@ func (g *GinAdapter) RegisterOpenAPI(path ...string) {
 			return
 		}
 		c.Data(http.StatusOK, "application/json", data)
-	})
+	}
+
+	if g.docsAuth != nil {
+		g.engine.GET(p, ginBasicAuth(*g.docsAuth), handler)
+	} else {
+		g.engine.GET(p, handler)
+	}
 }
 
 // RegisterDocs registers the docs UI endpoint.
@@ -339,5 +368,133 @@ func (g *GinAdapter) RegisterDocs(path ...string) {
 	if len(path) > 0 {
 		p = path[0]
 	}
-	ui.RegisterGin(g.engine, p, g.openAPIPath)
+
+	if g.docsAuth != nil {
+		ui.RegisterGinWithAuth(g.engine, p, g.openAPIPath, ginBasicAuth(*g.docsAuth))
+	} else {
+		ui.RegisterGin(g.engine, p, g.openAPIPath)
+	}
+}
+
+// Discover scans all existing routes registered on the Gin engine and
+// automatically generates documentation entries for them. This allows
+// using Swagify with existing projects without migrating route registration.
+//
+// Usage:
+//
+//	r := gin.Default()
+//	r.GET("/users", listUsers)
+//	r.POST("/users", createUser)
+//
+//	api := swagify.NewGin(r)
+//	api.Discover() // auto-documents all routes
+//	api.RegisterOpenAPI()
+//	api.RegisterDocs()
+func (g *GinAdapter) Discover(opts ...DiscoverOptions) {
+	opt := DiscoverOptions{}
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+
+	// Set defaults
+	if opt.AutoTags == nil {
+		opt.AutoTags = boolPtr(true)
+	}
+	if opt.AutoSummary == nil {
+		opt.AutoSummary = boolPtr(true)
+	}
+
+	// Use Gin's Routes() to discover all registered routes
+	routes := g.engine.Routes()
+
+	// Deduplicate
+	seen := make(map[string]bool)
+
+	for _, gr := range routes {
+		method := gr.Method
+		path := gr.Path
+
+		// Skip unsupported methods
+		if method == "HEAD" || method == "OPTIONS" || method == "TRACE" || method == "CONNECT" {
+			continue
+		}
+
+		// Deduplicate
+		key := method + " " + path
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		// Apply path filters
+		if !shouldInclude(path, opt) {
+			continue
+		}
+
+		// Check if this route is already registered (avoid duplicates from mixed usage)
+		if existing := g.registry.FindRoute(key); existing != nil {
+			continue
+		}
+
+		// Build the route
+		route := &Route{
+			Method: method,
+			Path:   path,
+		}
+
+		// Auto-generate summary
+		if *opt.AutoSummary {
+			route.Summary = autoSummary(method, path)
+		}
+
+		// Auto-generate tags
+		if *opt.AutoTags {
+			tag := autoTag(path)
+			if tag != "" {
+				route.Tags = []string{tag}
+			}
+		}
+
+		// Register (docs only — handler is already bound to the Gin engine)
+		g.registry.Register(route)
+	}
+}
+
+// Enrich adds metadata to a previously discovered (or registered) route.
+// The key format is "METHOD /path", e.g., "GET /users/:id".
+//
+// Usage:
+//
+//	api.Discover()
+//	api.Enrich("GET /users", swagify.Summary("List all users"), swagify.WithResponse(UsersResponse{}))
+//	api.Enrich("POST /users", swagify.WithRequest(CreateUserReq{}), swagify.WithResponse(UserResponse{}))
+func (g *GinAdapter) Enrich(key string, opts ...RouteOption) {
+	route := g.registry.FindRoute(key)
+	if route == nil {
+		return
+	}
+
+	applyOptions(route, opts)
+
+	// Re-generate schemas for any new types added via enrichment
+	if route.RequestType != nil {
+		g.registry.SchemaGenerator().GenerateSchemaFromType(route.RequestType)
+	}
+	if route.ResponseType != nil {
+		g.registry.SchemaGenerator().GenerateSchemaFromType(route.ResponseType)
+	}
+	if route.QueryType != nil {
+		g.registry.SchemaGenerator().GenerateSchemaFromType(route.QueryType)
+	}
+	if route.PathType != nil {
+		g.registry.SchemaGenerator().GenerateSchemaFromType(route.PathType)
+	}
+	if route.HeaderType != nil {
+		g.registry.SchemaGenerator().GenerateSchemaFromType(route.HeaderType)
+	}
+	for _, resp := range route.Responses {
+		if resp.Type != nil {
+			g.registry.SchemaGenerator().GenerateSchemaFromType(resp.Type)
+		}
+	}
 }

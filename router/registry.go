@@ -2,6 +2,7 @@ package router
 
 import (
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/swagify/core"
@@ -108,6 +109,27 @@ func (r *Registry) Register(route *Route) {
 	}
 
 	r.routes = append(r.routes, route)
+}
+
+// FindRoute locates a registered route by "METHOD /path" (e.g., "GET /users/:id").
+// Returns nil if not found. Used by Enrich() to add metadata to discovered routes.
+func (r *Registry) FindRoute(key string) *Route {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	parts := strings.SplitN(key, " ", 2)
+	if len(parts) != 2 {
+		return nil
+	}
+	method := strings.ToUpper(parts[0])
+	path := strings.TrimSpace(parts[1])
+
+	for _, route := range r.routes {
+		if route.Method == method && route.Path == path {
+			return route
+		}
+	}
+	return nil
 }
 
 // Routes returns openapi-compatible Route objects.

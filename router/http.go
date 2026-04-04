@@ -18,6 +18,9 @@ type HTTPAdapter struct {
 	// Configuration
 	openAPIPath string
 	docsPath    string
+
+	// Docs authentication
+	docsAuth *DocsAuthConfig
 }
 
 // HTTPConfig holds configuration for the net/http adapter.
@@ -152,6 +155,18 @@ func HTTPTypedPOST[Req any, Res any](h *HTTPAdapter, path string, handler func(r
 	h.mux.HandleFunc("POST "+path, wrappedHandler)
 }
 
+// BasicAuth protects the docs UI and OpenAPI JSON endpoints with HTTP Basic Authentication.
+// Must be called before RegisterOpenAPI() and RegisterDocs().
+func (h *HTTPAdapter) BasicAuth(username, password string, configs ...DocsAuthConfig) {
+	cfg := DocsAuthConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
+	cfg.Username = username
+	cfg.Password = password
+	h.docsAuth = &cfg
+}
+
 // RegisterOpenAPI registers the OpenAPI JSON endpoint.
 func (h *HTTPAdapter) RegisterOpenAPI(path ...string) {
 	p := h.openAPIPath
@@ -160,7 +175,7 @@ func (h *HTTPAdapter) RegisterOpenAPI(path ...string) {
 		h.openAPIPath = p
 	}
 
-	h.mux.HandleFunc("GET "+p, func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gen := openapi.NewGenerator(h.registry)
 		doc := gen.Generate()
 		data, err := json.MarshalIndent(doc, "", "  ")
@@ -171,6 +186,12 @@ func (h *HTTPAdapter) RegisterOpenAPI(path ...string) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
 	})
+
+	if h.docsAuth != nil {
+		h.mux.Handle("GET "+p, httpBasicAuth(*h.docsAuth)(handler))
+	} else {
+		h.mux.Handle("GET "+p, handler)
+	}
 }
 
 // RegisterDocs registers the docs UI endpoint.
@@ -179,5 +200,10 @@ func (h *HTTPAdapter) RegisterDocs(path ...string) {
 	if len(path) > 0 {
 		p = path[0]
 	}
-	ui.RegisterHTTP(h.mux, p, h.openAPIPath)
+
+	if h.docsAuth != nil {
+		ui.RegisterHTTPWithAuth(h.mux, p, h.openAPIPath, httpBasicAuth(*h.docsAuth))
+	} else {
+		ui.RegisterHTTP(h.mux, p, h.openAPIPath)
+	}
 }
