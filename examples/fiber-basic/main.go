@@ -7,8 +7,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/swagify"
-	"github.com/swagify/core"
+	"github.com/mrgofurov/swagify"
+	"github.com/mrgofurov/swagify/core"
 )
 
 // --- Models ---

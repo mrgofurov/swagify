@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/swagify/core"
-	"github.com/swagify/openapi"
-	"github.com/swagify/ui"
+	"github.com/mrgofurov/swagify/core"
+	"github.com/mrgofurov/swagify/openapi"
+	"github.com/mrgofurov/swagify/ui"
 )
 
 // HTTPAdapter integrates swagify with the standard net/http package.

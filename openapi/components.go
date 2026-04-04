@@ -1,6 +1,6 @@
 package openapi
 
-import "github.com/swagify/core"
+import "github.com/mrgofurov/swagify/core"
 
 // convertSchema converts an internal core.Schema to an OpenAPI SchemaObject.
 func convertSchema(s *core.Schema) *SchemaObject {

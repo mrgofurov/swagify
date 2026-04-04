@@ -1,6 +1,6 @@
 package openapi
 
-import "github.com/swagify/core"
+import "github.com/mrgofurov/swagify/core"
 
 // buildSecuritySchemes converts internal security scheme definitions
 // to OpenAPI SecuritySchemeObjects.

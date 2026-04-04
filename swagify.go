@@ -39,8 +39,8 @@ package swagify
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v2"
-	"github.com/swagify/core"
-	"github.com/swagify/router"
+	"github.com/mrgofurov/swagify/core"
+	"github.com/mrgofurov/swagify/router"
 )
 
 // --- Framework Constructors ---
@@ -215,4 +215,3 @@ type DiscoverOptions = router.DiscoverOptions
 
 // DocsAuthConfig holds credentials for protecting the docs and OpenAPI endpoints.
 type DocsAuthConfig = router.DocsAuthConfig
-

@@ -7,9 +7,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/swagify"
-	"github.com/swagify/core"
-	"github.com/swagify/router"
+	"github.com/mrgofurov/swagify"
+	"github.com/mrgofurov/swagify/core"
+	"github.com/mrgofurov/swagify/router"
 )
 
 // --- Models ---
@@ -50,8 +50,8 @@ type ProductListResponse struct {
 }
 
 type ErrorResponse struct {
-	Error   string `json:"error" description:"Error message"`
-	Code    int    `json:"code" description:"Error code"`
+	Error string `json:"error" description:"Error message"`
+	Code  int    `json:"code" description:"Error code"`
 }
 
 // --- Typed Handlers (request/response types inferred via generics) ---
@@ -102,9 +102,9 @@ func getProduct(c *fiber.Ctx, _ GetProductQuery) (ProductResponse, error) {
 }
 
 type ListProductsQuery struct {
-	Page     int    `json:"page" description:"Page number" example:"1"`
-	Limit    int    `json:"limit" description:"Items per page" example:"20"`
-	Category string `json:"category,omitempty" description:"Filter by category" example:"electronics"`
+	Page     int      `json:"page" description:"Page number" example:"1"`
+	Limit    int      `json:"limit" description:"Items per page" example:"20"`
+	Category string   `json:"category,omitempty" description:"Filter by category" example:"electronics"`
 	MinPrice *float64 `json:"min_price,omitempty" description:"Minimum price filter"`
 	MaxPrice *float64 `json:"max_price,omitempty" description:"Maximum price filter"`
 }

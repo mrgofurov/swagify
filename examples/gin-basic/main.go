@@ -6,17 +6,17 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swagify"
-	"github.com/swagify/core"
+	"github.com/mrgofurov/swagify"
+	"github.com/mrgofurov/swagify/core"
 )
 
 // --- Models ---
 
 type CreateBookRequest struct {
-	Title  string `json:"title" validate:"required" description:"Book title" example:"The Go Programming Language"`
-	Author string `json:"author" validate:"required" description:"Book author" example:"Alan Donovan"`
-	ISBN   string `json:"isbn" validate:"required" description:"ISBN number" example:"978-0134190440"`
-	Year   int    `json:"year" validate:"min=1000,max=2100" description:"Publication year" example:"2015"`
+	Title  string  `json:"title" validate:"required" description:"Book title" example:"The Go Programming Language"`
+	Author string  `json:"author" validate:"required" description:"Book author" example:"Alan Donovan"`
+	ISBN   string  `json:"isbn" validate:"required" description:"ISBN number" example:"978-0134190440"`
+	Year   int     `json:"year" validate:"min=1000,max=2100" description:"Publication year" example:"2015"`
 	Price  float64 `json:"price" validate:"min=0" description:"Price in USD" example:"34.99"`
 }
 
@@ -41,8 +41,8 @@ type BookListResponse struct {
 }
 
 type ErrorResponse struct {
-	Error   string `json:"error" description:"Error message" example:"Resource not found"`
-	Code    int    `json:"code" description:"HTTP status code" example:"404"`
+	Error string `json:"error" description:"Error message" example:"Resource not found"`
+	Code  int    `json:"code" description:"HTTP status code" example:"404"`
 }
 
 type MessageResponse struct {

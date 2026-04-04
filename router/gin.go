@@ -6,9 +6,9 @@ import (
 	"reflect"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swagify/core"
-	"github.com/swagify/openapi"
-	"github.com/swagify/ui"
+	"github.com/mrgofurov/swagify/core"
+	"github.com/mrgofurov/swagify/openapi"
+	"github.com/mrgofurov/swagify/ui"
 )
 
 // GinAdapter integrates swagify with the Gin web framework.

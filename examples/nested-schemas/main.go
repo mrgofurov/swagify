@@ -7,8 +7,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/swagify"
-	"github.com/swagify/core"
+	"github.com/mrgofurov/swagify"
+	"github.com/mrgofurov/swagify/core"
 )
 
 // --- Deeply nested model hierarchy ---
@@ -34,35 +34,35 @@ type SocialLinks struct {
 }
 
 type CompanyInfo struct {
-	Name     string   `json:"name" description:"Company name" example:"Acme Corp"`
-	Industry string   `json:"industry" description:"Industry sector" example:"Technology"`
-	Size     string   `json:"size" validate:"oneof=startup small medium large enterprise" description:"Company size"`
-	Address  Address  `json:"address" description:"Company headquarters"`
+	Name     string  `json:"name" description:"Company name" example:"Acme Corp"`
+	Industry string  `json:"industry" description:"Industry sector" example:"Technology"`
+	Size     string  `json:"size" validate:"oneof=startup small medium large enterprise" description:"Company size"`
+	Address  Address `json:"address" description:"Company headquarters"`
 }
 
 type EmployeeProfile struct {
-	ID          int            `json:"id" description:"Employee ID" example:"1"`
-	FirstName   string         `json:"first_name" validate:"required" description:"First name" example:"John"`
-	LastName    string         `json:"last_name" validate:"required" description:"Last name" example:"Doe"`
-	Title       string         `json:"title" description:"Job title" example:"Senior Engineer"`
-	Department  string         `json:"department" description:"Department name" example:"Engineering"`
-	Contact     ContactInfo    `json:"contact" description:"Contact information"`
-	Social      *SocialLinks   `json:"social,omitempty" description:"Social media links"`
-	Company     CompanyInfo    `json:"company" description:"Company information"`
-	HomeAddress *Address       `json:"home_address,omitempty" description:"Home address"`
-	Skills      []string       `json:"skills" description:"List of skills"`
-	Projects    []ProjectBrief `json:"projects" description:"Active projects"`
+	ID          int               `json:"id" description:"Employee ID" example:"1"`
+	FirstName   string            `json:"first_name" validate:"required" description:"First name" example:"John"`
+	LastName    string            `json:"last_name" validate:"required" description:"Last name" example:"Doe"`
+	Title       string            `json:"title" description:"Job title" example:"Senior Engineer"`
+	Department  string            `json:"department" description:"Department name" example:"Engineering"`
+	Contact     ContactInfo       `json:"contact" description:"Contact information"`
+	Social      *SocialLinks      `json:"social,omitempty" description:"Social media links"`
+	Company     CompanyInfo       `json:"company" description:"Company information"`
+	HomeAddress *Address          `json:"home_address,omitempty" description:"Home address"`
+	Skills      []string          `json:"skills" description:"List of skills"`
+	Projects    []ProjectBrief    `json:"projects" description:"Active projects"`
 	Metadata    map[string]string `json:"metadata,omitempty" description:"Custom metadata key-value pairs"`
-	StartDate   time.Time      `json:"start_date" description:"Employment start date"`
-	IsActive    bool           `json:"is_active" description:"Whether the employee is currently active" example:"true"`
+	StartDate   time.Time         `json:"start_date" description:"Employment start date"`
+	IsActive    bool              `json:"is_active" description:"Whether the employee is currently active" example:"true"`
 }
 
 type ProjectBrief struct {
-	ID          int       `json:"id" description:"Project ID" example:"101"`
-	Name        string    `json:"name" description:"Project name" example:"Project Alpha"`
-	Role        string    `json:"role" description:"Role in the project" example:"Lead Developer"`
-	StartDate   time.Time `json:"start_date" description:"Project start date"`
-	EndDate     *time.Time `json:"end_date,omitempty" description:"Project end date (null if ongoing)"`
+	ID        int        `json:"id" description:"Project ID" example:"101"`
+	Name      string     `json:"name" description:"Project name" example:"Project Alpha"`
+	Role      string     `json:"role" description:"Role in the project" example:"Lead Developer"`
+	StartDate time.Time  `json:"start_date" description:"Project start date"`
+	EndDate   *time.Time `json:"end_date,omitempty" description:"Project end date (null if ongoing)"`
 }
 
 type CreateEmployeeRequest struct {

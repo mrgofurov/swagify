@@ -5,9 +5,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/swagify/core"
-	"github.com/swagify/internal/utils"
-	"github.com/swagify/openapi"
+	"github.com/mrgofurov/swagify/core"
+	"github.com/mrgofurov/swagify/internal/utils"
+	"github.com/mrgofurov/swagify/openapi"
 )
 
 // Registry holds all registered routes and provides OpenAPI generation data.

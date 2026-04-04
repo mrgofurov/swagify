@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/swagify/core"
-	"github.com/swagify/internal/utils"
+	"github.com/mrgofurov/swagify/core"
+	"github.com/mrgofurov/swagify/internal/utils"
 )
 
 // Route mirrors the router.Route type to avoid import cycles.

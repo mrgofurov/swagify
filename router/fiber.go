@@ -5,9 +5,9 @@ import (
 	"reflect"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/swagify/core"
-	"github.com/swagify/openapi"
-	"github.com/swagify/ui"
+	"github.com/mrgofurov/swagify/core"
+	"github.com/mrgofurov/swagify/openapi"
+	"github.com/mrgofurov/swagify/ui"
 )
 
 // FiberAdapter integrates swagify with the Fiber web framework.

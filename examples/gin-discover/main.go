@@ -10,8 +10,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swagify"
-	"github.com/swagify/core"
+	"github.com/mrgofurov/swagify"
+	"github.com/mrgofurov/swagify/core"
 )
 
 // --- Models ---

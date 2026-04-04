@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/swagify/internal/cache"
+	"github.com/mrgofurov/swagify/internal/cache"
 )
 
 // SchemaGenerator handles reflection-based JSON Schema generation

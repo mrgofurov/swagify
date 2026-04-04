@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v2"
-	"github.com/swagify/core"
+	"github.com/mrgofurov/swagify/core"
 )
 
 // Route represents a registered API route with all its metadata.
