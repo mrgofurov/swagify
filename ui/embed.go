@@ -1,5 +1,4 @@
-// Package ui provides embedded API documentation UI assets
-// and handler registration for multiple web frameworks.
+// Package ui provides the embedded Swagger UI and handler registration.
 package ui
 
 import (
@@ -7,119 +6,58 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gin-gonic/gin"
-	"github.com/gofiber/fiber/v2"
 	_ "embed"
 )
 
-//go:embed scalar/index.html
-var scalarHTML string
+//go:embed swagger/index.html
+var swaggerHTML string
 
-// templateData holds the data injected into the HTML template.
+// templateData holds the values injected into the UI template.
 type templateData struct {
 	Title   string
 	SpecURL string
 }
 
-// renderHTML renders the docs HTML with the given spec URL.
+// renderHTML renders the Swagger UI HTML with the given spec URL and title.
 func renderHTML(specURL string, title ...string) (string, error) {
 	t := "API Documentation"
 	if len(title) > 0 && title[0] != "" {
 		t = title[0]
 	}
 
-	tmpl, err := template.New("docs").Parse(scalarHTML)
+	tmpl, err := template.New("docs").Parse(swaggerHTML)
 	if err != nil {
 		return "", err
 	}
 
 	var buf strings.Builder
-	err = tmpl.Execute(&buf, templateData{
-		Title:   t,
-		SpecURL: specURL,
-	})
-	if err != nil {
+	if err := tmpl.Execute(&buf, templateData{Title: t, SpecURL: specURL}); err != nil {
 		return "", err
 	}
-
 	return buf.String(), nil
 }
 
-// RegisterFiber registers the docs UI route on a Fiber app.
-func RegisterFiber(app *fiber.App, docsPath, specURL string) {
-	html, err := renderHTML(specURL)
-	if err != nil {
-		panic("swagify: failed to render docs UI template: " + err.Error())
-	}
-
-	app.Get(docsPath, func(c *fiber.Ctx) error {
-		c.Set("Content-Type", "text/html; charset=utf-8")
-		return c.SendString(html)
-	})
-}
-
-// RegisterFiberWithAuth registers the docs UI route on a Fiber app with an auth middleware.
-func RegisterFiberWithAuth(app *fiber.App, docsPath, specURL string, authMiddleware fiber.Handler) {
-	html, err := renderHTML(specURL)
-	if err != nil {
-		panic("swagify: failed to render docs UI template: " + err.Error())
-	}
-
-	app.Get(docsPath, authMiddleware, func(c *fiber.Ctx) error {
-		c.Set("Content-Type", "text/html; charset=utf-8")
-		return c.SendString(html)
-	})
-}
-
-// RegisterGin registers the docs UI route on a Gin engine.
-func RegisterGin(engine *gin.Engine, docsPath, specURL string) {
-	html, err := renderHTML(specURL)
-	if err != nil {
-		panic("swagify: failed to render docs UI template: " + err.Error())
-	}
-
-	engine.GET(docsPath, func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
-	})
-}
-
-// RegisterGinWithAuth registers the docs UI route on a Gin engine with an auth middleware.
-func RegisterGinWithAuth(engine *gin.Engine, docsPath, specURL string, authMiddleware gin.HandlerFunc) {
-	html, err := renderHTML(specURL)
-	if err != nil {
-		panic("swagify: failed to render docs UI template: " + err.Error())
-	}
-
-	engine.GET(docsPath, authMiddleware, func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
-	})
-}
-
-// RegisterHTTP registers the docs UI route on a standard http.ServeMux.
+// RegisterHTTP mounts the Swagger UI on a standard http.ServeMux.
 func RegisterHTTP(mux *http.ServeMux, docsPath, specURL string) {
 	html, err := renderHTML(specURL)
 	if err != nil {
-		panic("swagify: failed to render docs UI template: " + err.Error())
+		panic("swagify: failed to render docs UI: " + err.Error())
 	}
-
 	mux.HandleFunc("GET "+docsPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(html))
+		w.Write([]byte(html)) //nolint:errcheck
 	})
 }
 
-// RegisterHTTPWithAuth registers the docs UI route on a standard http.ServeMux with auth middleware.
-func RegisterHTTPWithAuth(mux *http.ServeMux, docsPath, specURL string, authMiddleware func(http.Handler) http.Handler) {
+// RegisterHTTPWithAuth mounts the Swagger UI behind a middleware.
+func RegisterHTTPWithAuth(mux *http.ServeMux, docsPath, specURL string, mw func(http.Handler) http.Handler) {
 	html, err := renderHTML(specURL)
 	if err != nil {
-		panic("swagify: failed to render docs UI template: " + err.Error())
+		panic("swagify: failed to render docs UI: " + err.Error())
 	}
-
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(html))
+		w.Write([]byte(html)) //nolint:errcheck
 	})
-
-	mux.Handle("GET "+docsPath, authMiddleware(handler))
+	mux.Handle("GET "+docsPath, mw(handler))
 }
-
