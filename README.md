@@ -1,21 +1,18 @@
 # Swagify
 
-**Swagify** is a modern, code-first OpenAPI 3.1 documentation package for Go web frameworks such as **Fiber** and **Gin**.
+**Swagify** is a modern, code-first API framework for Go that provides a developer experience closer to **FastAPI**, **Django REST Swagger**, and other modern API tooling — without the need for ugly Swagger comments, annotation-heavy setup, or massive external dependencies.
 
-It helps Go developers build beautiful API documentation with a developer experience closer to **FastAPI**, **Django REST Swagger**, and other modern API tooling — without ugly Swagger comments or annotation-heavy setup.
+With Swagify, you define your routes, request models, and response models in plain Go, and it automatically generates and serves:
 
-With Swagify, you define your routes, request models, and response models in Go, and it generates:
-
-- OpenAPI 3.1 JSON
-- interactive API docs UI
-- component schemas
-- request/response documentation
-- query, path, and header parameter documentation
-- tags, summaries, descriptions, and security metadata
+- Complete OpenAPI 3.1 JSON
+- Interactive API docs UI (Swagger)
+- Component schemas directly from Go structs
+- Request/response documentation
+- Query, path, and header parameter documentation
 
 ## Why Swagify?
 
-Traditional Swagger tooling in Go often relies on comment-based generation like this:
+Traditional Swagger tooling in Go often relies on comment-based generation:
 
 ```go
 // @Summary Create user
@@ -27,30 +24,22 @@ Traditional Swagger tooling in Go often relies on comment-based generation like 
 // @Success 200 {object} User
 // @Router /users [post]
 ```
-That works, but it is verbose, fragile, and not very pleasant to maintain.
+That works, but it is verbose, fragile, and unpleasant to maintain.
 
-Swagify takes a different approach:
+Previously, Swagify required Gin or Fiber to run. **Not anymore.** Swagify is now its own standalone API framework built purely on Go's standard library (`net/http`). 
 
-- code-first
-- type-driven
-- clean route options
-- minimal boilerplate
-- modern docs UI
-- framework adapters for Fiber and Gin
+- **Zero dependencies** (just Go `1.22+`)
+- **Code-first and type-driven**
+- **Automatic schema inference**
+- **Extremely fast** and simple to use
 
 ## Features
 
-- OpenAPI 3.1 generation
-- Fiber support
-- Gin support
-- route-level summaries, descriptions, tags, and operation IDs
-- request and response model documentation
-- query, path, and header parameter documentation
-- custom success and error responses
-- security documentation helpers
-- modern embedded docs UI
-- no filesystem-relative static docs dependency
-- no Swagger comments required
+- **Zero external dependencies**: Built directly on Go's `net/http`
+- **FastAPI-like Developer Experience**: Handlers naturally declare their request and response types, and Swagify automatically maps them to HTTP logic and OpenAPI specifications.
+- **OpenAPI 3.1 generation** out-of-the-box
+- **Automatic Route Discovery**: Add a route, and its schema, path, method, and tags are documented instantly.
+- **Modern embedded Docs UI** (`/docs` endpoint)
 
 ## Installation
 
@@ -58,259 +47,116 @@ Swagify takes a different approach:
 go get github.com/mrgofurov/swagify
 ```
 
-Replace the module path above with your real repository path.
-
 ## Quick Start
 
-### Fiber
+Here is a full API implementation demonstrating how concise and powerful Swagify can be:
 
 ```go
 package main
 
 import (
+	"fmt"
 	"log"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/mrgofurov/swagify"
 	"github.com/mrgofurov/swagify/core"
 )
 
-type UserResponse struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+// --- Models ---
+// Fields, descriptions, and examples seamlessly propagate to the OpenAPI specs.
+
+type CreateUserRequest struct {
+	Name  string `json:"name" description:"Full name" example:"Alice"`
+	Email string `json:"email" description:"Email address" example:"alice@example.com"`
 }
 
-type ErrorResponse struct {
-	Message string `json:"message"`
+type User struct {
+	ID    int    `json:"id" description:"User ID" example:"1"`
+	Name  string `json:"name" description:"Full name" example:"Alice"`
+	Email string `json:"email" description:"Email address" example:"alice@example.com"`
 }
 
-func getUser(c *fiber.Ctx) error {
-	id := c.Params("id")
+type ListUsersQuery struct {
+	Page  int `json:"page" description:"Page number" example:"1"`
+	Limit int `json:"limit" description:"Items per page" example:"20"`
+}
 
-	return c.JSON(UserResponse{
-		ID:    1,
-		Name:  "Ali",
-		Email: "ali@example.com",
-		_ = id,
-	})
+type UserList struct {
+	Users []User `json:"users"`
+	Total int    `json:"total" example:"1"`
+}
+
+// --- Handlers ---
+// Handlers declare your request query params/bodies and response bodies as native Go types.
+
+func listUsers(ctx *swagify.Ctx, q ListUsersQuery) (UserList, error) {
+	return UserList{
+		Users: []User{{ID: 1, Name: "Alice", Email: "alice@example.com"}},
+		Total: 1,
+	}, nil
+}
+
+func getUser(ctx *swagify.Ctx) (User, error) {
+    // Path params are accessed intuitively
+	id := ctx.Param("id")
+	return User{ID: 1, Name: fmt.Sprintf("User %s", id), Email: "user@example.com"}, nil
+}
+
+func createUser(ctx *swagify.Ctx, req CreateUserRequest) (User, error) {
+	return User{ID: 1, Name: req.Name, Email: req.Email}, nil
 }
 
 func main() {
-	app := fiber.New()
-
-	api := swagify.NewFiber(app, swagify.FiberConfig{
-		Info: &core.Info{
-			Title:       "User API",
-			Description: "Example API documented with Swagify",
-			Version:     "1.0.0",
-		},
+	api := swagify.New(swagify.Config{
+		Title:       "User API",
+		Description: "Simple user management API",
+		Version:     "1.0.0",
+		Servers:     []core.Server{{URL: "http://localhost:8080"}},
 	})
 
-	api.GET("/users/:id", getUser,
-		swagify.Summary("Get user by ID"),
-		swagify.Description("Returns a single user by its unique identifier."),
-		swagify.Tags("Users"),
-		swagify.WithResponse(UserResponse{}),
-		swagify.ErrorResponse(404, ErrorResponse{}, "User not found"),
-	)
+	// All schemas, summaries, and tags are inferred from handlers
+	api.GET("/users", listUsers)
+	api.GET("/users/{id}", getUser)
+	api.POST("/users", createUser)
 
-	api.RegisterOpenAPI("/openapi.json")
-	api.RegisterDocs("/docs")
-
-	log.Fatal(app.Listen(":8080"))
+	log.Println("Listening on http://localhost:8080")
+	log.Println("Docs:    http://localhost:8080/docs")
+	log.Fatal(api.Run(":8080")) // Start standard library server!
 }
 ```
 
 Open:
+- **Docs UI**: http://localhost:8080/docs
+- **OpenAPI JSON**: http://localhost:8080/openapi.json
 
-Docs UI: http://localhost:8080/docs
+## Handler Signatures
 
-OpenAPI JSON: http://localhost:8080/openapi.json
+Swagify scans your handler's function signature to automatically determine how to parse requests, serialize responses, and build your API specification.
 
-### Gin
+| Signature | What's Inferred |
+|-----------|-----------------|
+| `func(http.ResponseWriter, *http.Request)` | Plain native handler, no automatic schema. |
+| `func(*swagify.Ctx) error` | No body handling (use `ctx.Param("id")` for path variables). |
+| `func(*swagify.Ctx) (Res, error)` | Automatically generates a response schema. |
+| `func(*swagify.Ctx, Req) (Res, error)` | Automatically generates request **and** response schemas. |
 
-```go
-package main
+### Request Parsing Behavior
 
-import (
-	"net/http"
+How `Req` is parsed depends automatically on the HTTP method:
 
-	"github.com/gin-gonic/gin"
-	"github.com/mrgofurov/swagify"
-)
+- **`GET` / `DELETE`**: `Req` is parsed and hydrated from **URL Query Parameters**.
+- **`POST` / `PUT` / `PATCH`**: `Req` is parsed from the **JSON Body**.
+- **Path Parameters**: Extracted directly using `ctx.Param("name")`.
 
-type UserResponse struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
+## Manual Overrides
 
-func getUser(c *gin.Context) {
-	c.JSON(http.StatusOK, UserResponse{
-		ID:   1,
-		Name: "Ali",
-	})
-}
-
-func main() {
-	r := gin.Default()
-
-	api := swagify.NewGin(r)
-
-	api.GET("/users/:id", getUser,
-		swagify.Summary("Get user by ID"),
-		swagify.Tags("Users"),
-		swagify.WithResponse(UserResponse{}),
-	)
-
-	api.RegisterOpenAPI("/openapi.json")
-	api.RegisterDocs("/docs")
-
-	r.Run(":8080")
-}
-```
-## Basic Usage
-
-### Documenting a GET endpoint
+Even though most metadata is inferred naturally from the handlers and structs, you can always enhance any route explicitly using decorators:
 
 ```go
-api.GET("/users/:id", getUser,
-	swagify.Summary("Get user by ID"),
-	swagify.Description("Returns a single user by their unique identifier."),
-	swagify.Tags("Users"),
-	swagify.WithResponse(UserResponse{}),
-	swagify.ErrorResponse(404, ErrorResponse{}, "User not found"),
-)
-```
-
-### Documenting a POST endpoint
-
-```go
-api.POST("/users", createUser,
-	swagify.Summary("Create a new user"),
-	swagify.Description("Creates a new user with the provided information."),
-	swagify.Tags("Users"),
-	swagify.WithRequest(CreateUserRequest{}),
-	swagify.WithResponse(UserResponse{}),
-	swagify.SuccessStatus(201),
-	swagify.ErrorResponse(400, ErrorResponse{}, "Invalid request body"),
-)
-```
-
-## Auto-Discovery (Zero Migration)
-
-Already have a Fiber or Gin project with hundreds of routes? No need to rewrite them. Use `Discover()` to auto-generate documentation from your existing routes:
-
-### Fiber
-
-```go
-// Your existing app — nothing changes here
-app := fiber.New()
-app.Get("/users", listUsers)
-app.Get("/users/:id", getUser)
-app.Post("/users", createUser)
-app.Put("/users/:id", updateUser)
-app.Delete("/users/:id", deleteUser)
-
-// Attach Swagify and auto-discover all routes
-api := swagify.NewFiber(app, swagify.FiberConfig{
-    Info: &core.Info{
-        Title:   "My API",
-        Version: "1.0.0",
-    },
-})
-api.Discover()
-
-api.RegisterOpenAPI()
-api.RegisterDocs()
-log.Fatal(app.Listen(":8080"))
-```
-
-### Gin
-
-```go
-r := gin.Default()
-r.GET("/products", listProducts)
-r.POST("/products", createProduct)
-
-api := swagify.NewGin(r)
-api.Discover()
-
-api.RegisterOpenAPI()
-api.RegisterDocs()
-r.Run(":8080")
-```
-
-### Enriching Discovered Routes
-
-After discovery, you can optionally enrich specific routes with request/response types and metadata:
-
-```go
-api.Discover()
-
-// Add rich documentation to specific routes
-api.Enrich("GET /users",
-    swagify.Summary("List all users"),
+api.GET("/users/{id}", getUser,
+    swagify.Summary("Get user by ID"),
+    swagify.Description("Returns a single user by their unique identifier."),
     swagify.Tags("Users"),
-    swagify.WithResponse(UserListResponse{}),
-    swagify.QueryParams(ListUsersQuery{}),
-)
-
-api.Enrich("POST /users",
-    swagify.Summary("Create a new user"),
-    swagify.Tags("Users"),
-    swagify.WithRequest(CreateUserRequest{}),
-    swagify.WithResponse(UserResponse{}),
+    swagify.ErrorResponse(404, ErrorResponse{}, "User not found"),
 )
 ```
-
-### Discovery Options
-
-Control which routes are discovered:
-
-```go
-api.Discover(swagify.DiscoverOptions{
-    // Only document routes under /api
-    IncludePaths: []string{"/api"},
-
-    // Skip health/metrics endpoints
-    ExcludePaths: []string{"/internal", "/metrics"},
-})
-```
-
-### What Discover Auto-Generates
-
-Even without enrichment, `Discover()` generates useful documentation:
-
-| Route | Auto Summary | Auto Tag |
-|-------|-------------|----------|
-| `GET /users` | List users | Users |
-| `GET /users/:id` | Get user by id | Users |
-| `POST /users` | Create user | Users |
-| `PUT /users/:id` | Update user by id | Users |
-| `DELETE /users/:id` | Delete user by id | Users |
-| `GET /api/v1/orders` | List orders | Orders |
-
-## Protecting Docs with BasicAuth
-
-Protect your `/docs` and `/openapi.json` endpoints with HTTP Basic Authentication:
-
-```go
-api := swagify.NewFiber(app)
-
-// Simple — just username and password
-api.BasicAuth("admin", "secret123")
-
-api.RegisterOpenAPI()  // protected
-api.RegisterDocs()     // protected
-```
-
-With a custom realm (shown in the browser prompt):
-
-```go
-api.BasicAuth("admin", "secret123", swagify.DocsAuthConfig{
-    Realm: "My API Documentation",
-})
-```
-
-> **Note:** `BasicAuth()` must be called **before** `RegisterOpenAPI()` and `RegisterDocs()`. It only protects the docs endpoints — your API routes remain unaffected.
